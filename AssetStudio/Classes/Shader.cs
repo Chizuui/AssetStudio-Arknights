@@ -876,49 +876,55 @@ namespace AssetStudio {
 		public byte[] compressedBlob;
 
 		public Shader(ObjectReader reader) : base(reader) {
-			if (version[0] == 5 && version[1] >= 5 || version[0] > 5) //5.5 and up
-			{
-				m_ParsedForm = new SerializedShader(reader);
-				platforms = reader.ReadUInt32Array().Select(x => (ShaderCompilerPlatform)x).ToArray();
-				if (version[0] > 2019 || (version[0] == 2019 && version[1] >= 3)) //2019.3 and up
+			try {
+				if (version[0] == 5 && version[1] >= 5 || version[0] > 5) //5.5 and up
 				{
-					offsets = reader.ReadUInt32ArrayArray();
-					compressedLengths = reader.ReadUInt32ArrayArray();
-					decompressedLengths = reader.ReadUInt32ArrayArray();
+					m_ParsedForm = new SerializedShader(reader);
+					platforms = reader.ReadUInt32Array().Select(x => (ShaderCompilerPlatform)x).ToArray();
+					if (version[0] > 2019 || (version[0] == 2019 && version[1] >= 3)) //2019.3 and up
+					{
+						offsets = reader.ReadUInt32ArrayArray();
+						compressedLengths = reader.ReadUInt32ArrayArray();
+						decompressedLengths = reader.ReadUInt32ArrayArray();
+					}
+					else {
+						offsets = reader.ReadUInt32Array().Select(x => new[] { x }).ToArray();
+						compressedLengths = reader.ReadUInt32Array().Select(x => new[] { x }).ToArray();
+						decompressedLengths = reader.ReadUInt32Array().Select(x => new[] { x }).ToArray();
+					}
+					compressedBlob = reader.ReadUInt8Array();
+					reader.AlignStream();
+
+					var m_DependenciesCount = reader.ReadInt32();
+					for (int i = 0; i < m_DependenciesCount; i++) {
+						new PPtr<Shader>(reader);
+					}
+
+					if (version[0] >= 2018) {
+						var m_NonModifiableTexturesCount = reader.ReadInt32();
+						for (int i = 0; i < m_NonModifiableTexturesCount; i++) {
+							var first = reader.ReadAlignedString();
+							new PPtr<Texture>(reader);
+						}
+					}
+
+					var m_ShaderIsBaked = reader.ReadBoolean();
+					reader.AlignStream();
 				}
 				else {
-					offsets = reader.ReadUInt32Array().Select(x => new[] { x }).ToArray();
-					compressedLengths = reader.ReadUInt32Array().Select(x => new[] { x }).ToArray();
-					decompressedLengths = reader.ReadUInt32Array().Select(x => new[] { x }).ToArray();
-				}
-				compressedBlob = reader.ReadUInt8Array();
-				reader.AlignStream();
-
-				var m_DependenciesCount = reader.ReadInt32();
-				for (int i = 0; i < m_DependenciesCount; i++) {
-					new PPtr<Shader>(reader);
-				}
-
-				if (version[0] >= 2018) {
-					var m_NonModifiableTexturesCount = reader.ReadInt32();
-					for (int i = 0; i < m_NonModifiableTexturesCount; i++) {
-						var first = reader.ReadAlignedString();
-						new PPtr<Texture>(reader);
+					m_Script = reader.ReadUInt8Array();
+					reader.AlignStream();
+					var m_PathName = reader.ReadAlignedString();
+					if (version[0] == 5 && version[1] >= 3) //5.3 - 5.4
+					{
+						decompressedSize = reader.ReadUInt32();
+						m_SubProgramBlob = reader.ReadUInt8Array();
 					}
 				}
-
-				var m_ShaderIsBaked = reader.ReadBoolean();
-				reader.AlignStream();
-			}
-			else {
-				m_Script = reader.ReadUInt8Array();
-				reader.AlignStream();
-				var m_PathName = reader.ReadAlignedString();
-				if (version[0] == 5 && version[1] >= 3) //5.3 - 5.4
-				{
-					decompressedSize = reader.ReadUInt32();
-					m_SubProgramBlob = reader.ReadUInt8Array();
-				}
+			} catch (EndOfStreamException) {
+				// Ignore custom modifications in Chinese clients (like Arknights) which
+				// truncate Shader structs, preventing AssetStudio GUI from throwing 
+				// annoying EndOfStreamException dialogs constantly.
 			}
 		}
 	}
