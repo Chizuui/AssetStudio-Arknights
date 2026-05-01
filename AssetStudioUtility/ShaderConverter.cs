@@ -25,10 +25,13 @@ namespace AssetStudio {
 				return header + ConvertSerializedShader(shader);
 			}
 
-			return header + Encoding.UTF8.GetString(shader.m_Script);
+			return header + (shader.m_Script != null ? Encoding.UTF8.GetString(shader.m_Script) : "// Shader data is missing or stripped.");
 		}
 
 		private static string ConvertSerializedShader(Shader shader) {
+			if (shader.platforms == null || shader.offsets == null || shader.compressedLengths == null || shader.decompressedLengths == null || shader.m_ParsedForm == null) {
+				return "// Shader structural data is incomplete or stripped.\n// Arknights often deletes deep shader blobstreams.";
+			}
 			var length = shader.platforms.Length;
 			var shaderPrograms = new ShaderProgram[length];
 			for (var i = 0; i < length; i++) {
